@@ -14,17 +14,16 @@ class App:
                              text="Process from File",
                              command=self.file_click, width=50)
         self.slogan.pack(side=LEFT)
+        self.slogan = Button(frame,
+                             text="Exit",
+                             command=frame.quit, width=20)
+        self.slogan.pack(side=LEFT)
 
     def webcam_click(self):
         process_from_cam()
 
     def file_click(self):
         process_from_file()
-
-
-
-
-
 
 root = Tk()
 root.title("Virtual Reality FEUP")

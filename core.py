@@ -33,12 +33,28 @@ def binarize_image(original_image):
     _, binary_image = cv2.threshold(gray_scale_image, 127, 255, cv2.THRESH_BINARY)
     return binary_image
 
+# Get marker borders
+def get_marker_borders(marker_image):
+    marker_image = binarize_image(marker_image)
+    contours = get_rectangular_contours(marker_image)
+    contours_areas_sorted = sorted(contours, key=lambda c: cv2.contourArea(c), reverse=True)
+    return contours_areas_sorted[1]
+
+
+def get_image_marker_borders(image_rectangular_contours, marker_borders):
+    return ""
+
 
 def process_from_file():
     original_image = cv2.imread('images/image.jpg')
+    marker_image = cv2.imread('images/pattern_hiro.jpg')
+    marker_borders = get_marker_borders(marker_image)
     binary_image = binarize_image(original_image)
     rectangular_contours = get_rectangular_contours(binary_image)
+    image_marker_borders =
+
     img_contours = cv2.drawContours(copy.copy(original_image), rectangular_contours, -1, (0, 255, 0), 3)
+
     cv2.imshow('Imagem com bordos quadrados', img_contours)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
