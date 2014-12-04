@@ -68,26 +68,9 @@ def get_dimensions(points):
     return width, height
 
 
-
-def get_corners(points):
-    left_top = points[0]
-    left_bottom = points[0]
-    right_bottom = points[0]
-    right_top = points[0]
-
-    for point in points:
-        x = point[0]
-        y = point[1]
-        if x <= left_top[0] and y <= left_top[1]:
-            left_top = point
-        if x <= left_bottom[0] and y >= left_bottom[1]:
-            left_bottom = point
-        if y >= right_bottom[1] and x >= right_bottom[0]:
-            right_bottom = point
-        if y <= right_top[1] and x >= right_top[0]:
-            right_top = point
-    return [left_top, left_bottom, right_bottom, right_top]
-
+# http://opencvpython.blogspot.pt/2012/06/contours-2-brotherhood.html
+def get_corners(contour):
+    return cv2.approxPolyDP(contour, 0.1*cv2.arcLength(contour, True), True)
 
 
 
@@ -98,17 +81,18 @@ def compare_contours(original_image_binary, original_image_contours, marker_imag
 
     for contour in original_image_contours:
         # Get corners
-        contour_list = convert_to_list(contour)
-        contour_corners = get_corners(contour_list)
+        corners = get_corners(contour)
 
         # Compute transformation matrix
-        src = np.array(contour_corners, np.float32)
+        src = np.array(corners, np.float32)
         dst = np.array([[0, 0], [0, height - 1], [width - 1, height - 1], [width - 1, 0]], np.float32)
         matrix = cv2.getPerspectiveTransform(src, dst)
 
         # Generate frontal view from perspective
-        image_perspective = cv2.warpPerspective(original_image_binary, matrix, (width*2, height*2))
-        cv2.imshow(str(uuid.uuid4()), image_perspective)
+        image_frontal_perspective = cv2.warpPerspective(original_image_binary, matrix, (width, height))
+        cv2.imshow(str(uuid.uuid4()), image_frontal_perspective)
+
+
 
 
     return ""
@@ -128,12 +112,14 @@ def process_from_file():
     marker_borders = get_marker_borders(binary_marker_image)
 
     # Compare contours
-    image_marker_borders = compare_contours(binary_image, image_rectangular_contours, binary_marker_image, marker_borders)
+    corners = compare_contours(binary_image, image_rectangular_contours, binary_marker_image, marker_borders)
 
     # Compute homography
 
 
+
     img_contours = cv2.drawContours(copy.copy(original_image), image_rectangular_contours, -1, (0, 255, 0), 3)
+    #img_contours = cv2.drawContours(img_contours, [corners], -1, (0, 0, 255), 3)
 
     cv2.imshow('Imagem com bordos quadrados', img_contours)
     cv2.waitKey(0)
