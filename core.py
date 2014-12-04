@@ -38,7 +38,7 @@ def binarize_image(original_image):
 def get_marker_borders(marker_image):
     contours = get_rectangular_contours(marker_image)
     contours_areas_sorted = sorted(contours, key=lambda c: cv2.contourArea(c), reverse=True)
-    return contours_areas_sorted[2]
+    return contours_areas_sorted[0]
 
 
 def convert_to_list(ndarray_structure):
@@ -79,7 +79,7 @@ def compare_contours(original_image_binary, original_image_contours, marker_imag
     marker_borders = convert_to_list(marker_borders)
     width, height = get_dimensions(marker_borders)
 
-    for contour in original_image_contours:
+    for contour in original_image_contours[1:]:
         # Get corners
         corners = get_corners(contour)
 
@@ -92,16 +92,21 @@ def compare_contours(original_image_binary, original_image_contours, marker_imag
         image_frontal_perspective = cv2.warpPerspective(original_image_binary, matrix, (width, height))
         cv2.imshow(str(uuid.uuid4()), image_frontal_perspective)
 
+        # Compare
+        if images_are_equal(image_frontal_perspective, marker_image_binary):
+            return corners
+
+    return False
 
 
-
-    return ""
-
+def images_are_equal(img1, img2):
+    #TODO
+    return True
 
 def process_from_file():
     # Image sources
     original_image = cv2.imread('images/image.jpg')
-    marker_image = cv2.imread('images/pattern_hiro.jpg')
+    marker_image = cv2.imread('images/pattern_hiro_crop.jpg')
 
     # Binarize images
     binary_image = binarize_image(original_image)
@@ -115,9 +120,6 @@ def process_from_file():
     corners = compare_contours(binary_image, image_rectangular_contours, binary_marker_image, marker_borders)
 
     # Compute homography
-
-
-
     img_contours = cv2.drawContours(copy.copy(original_image), image_rectangular_contours, -1, (0, 255, 0), 3)
     #img_contours = cv2.drawContours(img_contours, [corners], -1, (0, 0, 255), 3)
 
