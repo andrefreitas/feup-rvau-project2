@@ -74,10 +74,9 @@ def get_corners(contour):
 
 
 
-def compare_contours(original_image_binary, original_image_contours, marker_image_binary, marker_borders):
+def compare_contours(original_image_binary, original_image_contours, marker_image_binary):
     # Get marker corners and dimensions
-    marker_borders = convert_to_list(marker_borders)
-    width, height = get_dimensions(marker_borders)
+    height, width = marker_image_binary.shape
 
     for contour in original_image_contours[1:]:
         # Get corners
@@ -90,18 +89,33 @@ def compare_contours(original_image_binary, original_image_contours, marker_imag
 
         # Generate frontal view from perspective
         image_frontal_perspective = cv2.warpPerspective(original_image_binary, matrix, (width, height))
-        cv2.imshow(str(uuid.uuid4()), image_frontal_perspective)
 
         # Compare
-        if images_are_equal(image_frontal_perspective, marker_image_binary):
-            return corners
+        similarity = compute_similarity(image_frontal_perspective, marker_image_binary)
+
+
+
+
+
+
 
     return False
 
+# Compare 2 images of the same size
+def compute_similarity(img1, img2):
+    rest = cv2.bitwise_xor(img1, img2)
+    height, width = img1.shape
+    pixels = height * width
+    diffs = 0
+    for x in range(width):
+        for y in range(height):
+            if rest[y, x] != 0:
+                diffs += 1
 
-def images_are_equal(img1, img2):
-    #TODO
-    return True
+    similarity = (pixels - diffs) / float(pixels)
+
+    return similarity
+
 
 def process_from_file():
     # Image sources
@@ -114,12 +128,10 @@ def process_from_file():
 
     # Get contours
     image_rectangular_contours = get_rectangular_contours(binary_image)
-    marker_borders = get_marker_borders(binary_marker_image)
-
-    # Compare contours
-    corners = compare_contours(binary_image, image_rectangular_contours, binary_marker_image, marker_borders)
 
     # Compute homography
+    homography = compare_contours(binary_image, image_rectangular_contours, binary_marker_image)
+
     img_contours = cv2.drawContours(copy.copy(original_image), image_rectangular_contours, -1, (0, 255, 0), 3)
     #img_contours = cv2.drawContours(img_contours, [corners], -1, (0, 0, 255), 3)
 
