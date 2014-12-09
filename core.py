@@ -73,33 +73,54 @@ def get_corners(contour):
     return cv2.approxPolyDP(contour, 0.1*cv2.arcLength(contour, True), True)
 
 
+# http://stackoverflow.com/questions/9041681/opencv-python-rotate-image-by-x-degrees-around-specific-point
+def rotate_image(image, angle):
+    image_center = tuple(np.array(image.shape)/2)
+    rot_mat = cv2.getRotationMatrix2D(image_center, angle, 1.0)
+    result = cv2.warpAffine(image, rot_mat, image.shape, flags=cv2.INTER_LINEAR)
+    return result
 
 def compare_contours(original_image_binary, original_image_contours, marker_image_binary):
     # Get marker corners and dimensions
     height, width = marker_image_binary.shape
 
     for contour in original_image_contours[1:]:
+
         # Get corners
         corners = get_corners(contour)
+        a = corners[0]
+        b = corners[1]
+        c = corners[2]
+        d = corners[3]
 
-        # Compute transformation matrix
+        # Initial src and dst corners
         src = np.array(corners, np.float32)
         dst = np.array([[0, 0], [0, height - 1], [width - 1, height - 1], [width - 1, 0]], np.float32)
-        matrix = cv2.getPerspectiveTransform(src, dst)
 
-        # Generate frontal view from perspective
-        image_frontal_perspective = cv2.warpPerspective(original_image_binary, matrix, (width, height))
+        # Rotate and compare
+        for i in range(4):
 
-        # Compare
-        similarity = compute_similarity(image_frontal_perspective, marker_image_binary)
+            # Rotate real image
+            if i == 1:
+                src = np.array([b, c, d, a], np.float32)
+            elif i == 2:
+                src = np.array([c, d, a, b], np.float32)
+            elif i == 3:
+                src = np.array([d, a, b, c], np.float32)
 
+            # Compute homography
+            matrix = cv2.getPerspectiveTransform(src, dst)
 
+            # Generate frontal view from perspective
+            image_frontal_perspective = cv2.warpPerspective(original_image_binary, matrix, (width, height))
 
-
-
-
+            # Compare images
+            similarity = compute_similarity(image_frontal_perspective, marker_image_binary)
+            if similarity > 0.8:
+                return matrix
 
     return False
+
 
 # Compare 2 images of the same size
 def compute_similarity(img1, img2):
@@ -132,10 +153,7 @@ def process_from_file():
     # Compute homography
     homography = compare_contours(binary_image, image_rectangular_contours, binary_marker_image)
 
-    img_contours = cv2.drawContours(copy.copy(original_image), image_rectangular_contours, -1, (0, 255, 0), 3)
-    #img_contours = cv2.drawContours(img_contours, [corners], -1, (0, 0, 255), 3)
 
-    cv2.imshow('Imagem com bordos quadrados', img_contours)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
