@@ -151,10 +151,53 @@ def camera_pose_from_homography(H):
     return np.array([H1, H2, H3]), np.array([T])
 
 
+def calibrate_camera(img):
+    # termination criteria
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+
+    objp = np.zeros((6*9,3), np.float32)
+    objp[:,:2] = np.mgrid[0:9,0:6].T.reshape(-1,2)
+
+    chess = cv2.imread('images/chessboard.jpg')
+    gray_scale_image = cv2.cvtColor(chess, cv2.COLOR_BGR2GRAY)
+    ret, corners = cv2.findChessboardCorners(gray_scale_image, (9,6))
+
+    # Arrays to store object points and image points from all the images.
+    objpoints = [] # 3d point in real world space
+    imgpoints = [] # 2d points in image plane.
+
+    if ret:
+        objpoints.append(objp)
+
+        cv2.cornerSubPix(gray_scale_image,corners,(11,11),(-1,-1),criteria)
+        imgpoints.append(corners)
+
+    ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray_scale_image.shape[::-1],None,None)
+    return ret, mtx, dist
+
+
+def draw(img, imgpts):
+    imgpts = np.int32(imgpts).reshape(-1,2)
+
+    # draw ground floor in green
+    img = cv2.drawContours(img, [imgpts[:4]],-1,(0,255,0),-3)
+
+    # draw pillars in blue color
+    for i,j in zip(range(4),range(4,8)):
+        img = cv2.line(img, tuple(imgpts[i]), tuple(imgpts[j]),(255),3)
+
+    # draw top layer in red color
+    img = cv2.drawContours(img, [imgpts[4:]],-1,(0,0,255),3)
+
+    return img
+
 def process_from_file():
     # Image sources
     original_image = cv2.imread('images/image.jpg')
     marker_image = cv2.imread('images/pattern_hiro_crop.jpg')
+
+    # Calibrate camera
+    ret, mtx, dist = calibrate_camera(original_image)
 
     # Binarize images
     binary_image = binarize_image(original_image)
@@ -170,6 +213,13 @@ def process_from_file():
 
     axis = np.float32([[0,0,0], [0,3,0], [3,3,0], [3,0,0],
                    [0,0,-3],[0,3,-3],[3,3,-3],[3,0,-3] ])
+
+    # project 3D points to image plane
+    imgpts, jac = cv2.projectPoints(axis, rotation_matrix, translation_matrix, mtx, dist)
+
+    gray_scale_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2GRAY)
+    img = draw(gray_scale_image, imgpts)
+    cv2.imshow('Virtual Reality FEUP', img)
 
     cv2.waitKey(0)
     cv2.destroyAllWindows()
