@@ -1,9 +1,7 @@
 import cv2
 import copy
 import numpy as np
-from OpenGL.GL import *
-from OpenGL.GLU import *
-from OpenGL.GLUT import *
+import glob
 
 # Returns the cosine of the Angle
 def angle_cos(p0, p1, p2):
@@ -140,70 +138,18 @@ def compute_similarity(img1, img2):
     return similarity
 
 
-# http://stackoverflow.com/questions/8927771/computing-camera-pose-with-homography-matrix-based-on-4-coplanar-points
-def camera_pose_from_homography(homography):
-    h1 = homography[:, 0]
-    h2 = homography[:, 1]
-    h3 = np.cross(h1, h2)
+def camera_pose_from_homography(H):
+    H1 = H[:, 0]
+    H2 = H[:, 1]
+    H3 = np.cross(H1, H2)
 
-    norm1 = np.linalg.norm(h1)
-    norm2 = np.linalg.norm(h1)
+    norm1 = np.linalg.norm(H1)
+    norm2 = np.linalg.norm(H1)
     tnorm = (norm1 + norm2) / 2.0
 
-    t = homography[:, 2] / tnorm
-    return np.mat([h1, h2, h3, t])
+    T = H[:, 2] / tnorm
+    return np.array([H1, H2, H3]), np.array([T])
 
-
-def display_fun():
-    glClear(GL_COLOR_BUFFER_BIT)
-    glBegin(GL_POINTS)
-    glVertex2i(100, 50)
-    glVertex2i(100, 130)
-    glVertex2i(150, 130)
-    glEnd()
-    glFlush()
-
-def initFun():
-    glClearColor(1.0,1.0,1.0,0.0)
-    glColor3f(0.0,0.0, 0.0)
-    glPointSize(4.0)
-    glMatrixMode(GL_PROJECTION)
-    glLoadIdentity()
-    gluOrtho2D(0.0,640.0,0.0,480.0)
-
-def set_modelview_from_camera(camera_pose):
-    """ Set the model view matrix from camera pose. """
-    glutInit()
-    glutInitWindowSize(640, 480)
-    glutCreateWindow("Drawdots")
-    glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB)
-    glutDisplayFunc(display_fun)
-    initFun()
-    glutMainLoop()
-    """
-    glMatrixMode(GL_MODELVIEW)
-    glLoadIdentity()
-
-    # rotate teapot 90 deg around x-axis so that z-axis is up
-    Rx = np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]])
-    # set rotation to best approximation
-    R = camera_pose[:,:3]
-    U, S, V = np.linalg.svd(R)
-    R = np.dot(U, V)
-    R[0, :] = -R[0, :] # change sign of x-axis
-    # set translation
-
-    t = camera_pose[:, 3]
-    # setup 4*4 model view matrix
-    M = np.eye(4)
-    M[:3, :3] = np.dot(R, Rx)
-    M[:3, 3] = t
-    # transpose and flatten to get column order
-    M = M.T
-    m = M.flatten()
-    # replace model view with the new matrix
-    glLoadMatrixf(m)
-    glutWireCube(1.0)"""
 
 def process_from_file():
     # Image sources
@@ -220,9 +166,10 @@ def process_from_file():
     # Compute homography
     homography = compare_contours(binary_image, image_rectangular_contours, binary_marker_image)
 
-    camera_pose = camera_pose_from_homography(homography)
+    rotation_matrix, translation_matrix = camera_pose_from_homography(homography)
 
-    set_modelview_from_camera(camera_pose)
+    axis = np.float32([[0,0,0], [0,3,0], [3,3,0], [3,0,0],
+                   [0,0,-3],[0,3,-3],[3,3,-3],[3,0,-3] ])
 
     cv2.waitKey(0)
     cv2.destroyAllWindows()
