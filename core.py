@@ -16,7 +16,7 @@ def contour_is_rectangular(contour):
     if len(contour) == 4 and cv2.contourArea(contour) > 1000 and cv2.isContourConvex(contour):
         contour = contour.reshape(-1, 2)
         max_cos = np.max([angle_cos( contour[i], contour[(i+1) % 4], contour[(i+2) % 4] ) for i in xrange(4)])
-        if max_cos < 0.1:
+        if max_cos < 0.5:
             return True
     return False
 
@@ -232,15 +232,17 @@ def process_from_cam():
         axis = np.float32([[0,0,0], [30,0,0], [30,30,0], [0,30,0],
                        [0,0,-30],[30,0,-30],[30,30,-30],[0,30,-30] ])
 
-        src = src.reshape(4,2)
-        objp = np.array([[0,0,0],[30,0,0],[30,30,0],[0,30,0]], dtype=np.float32)
+        if type(src) is not bool:
+            src = src.reshape(4,2)
+            objp = np.array([[0,0,0],[30,0,0],[30,30,0],[0,30,0]], dtype=np.float32)
 
-        ret, rvec, tvec = cv2.solvePnP(objp, src, mtx, dist)
-        imgpts, jac = cv2.projectPoints(axis, rvec, tvec, mtx, dist)
+            ret, rvec, tvec = cv2.solvePnP(objp, src, mtx, dist)
+            imgpts, jac = cv2.projectPoints(axis, rvec, tvec, mtx, dist)
 
-        img = draw(frame, imgpts)
-        cv2.imshow('Virtual Reality FEUP', img)
-
+            img = draw(frame, imgpts)
+            cv2.imshow('Virtual Reality FEUP', img)
+        else:
+            cv2.imshow('Virtual Reality FEUP', frame)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
