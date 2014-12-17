@@ -73,13 +73,6 @@ def get_corners(contour):
     return cv2.approxPolyDP(contour, 0.1*cv2.arcLength(contour, True), True)
 
 
-# http://stackoverflow.com/questions/9041681/opencv-python-rotate-image-by-x-degrees-around-specific-point
-def rotate_image(image, angle):
-    image_center = tuple(np.array(image.shape)/2)
-    rot_mat = cv2.getRotationMatrix2D(image_center, angle, 1.0)
-    result = cv2.warpAffine(image, rot_mat, image.shape, flags=cv2.INTER_LINEAR)
-    return result
-
 def compare_contours(original_image_binary, original_image_contours, marker_image_binary):
     # Get marker corners and dimensions
     height, width = marker_image_binary.shape
@@ -117,7 +110,7 @@ def compare_contours(original_image_binary, original_image_contours, marker_imag
             # Compare images
             similarity = compute_similarity(image_frontal_perspective, marker_image_binary)
             if similarity > 0.8:
-                return matrix
+                return src
 
     return False
 
@@ -138,41 +131,33 @@ def compute_similarity(img1, img2):
     return similarity
 
 
-def camera_pose_from_homography(H):
-    H1 = H[:, 0]
-    H2 = H[:, 1]
-    H3 = np.cross(H1, H2)
-
-    norm1 = np.linalg.norm(H1)
-    norm2 = np.linalg.norm(H1)
-    tnorm = (norm1 + norm2) / 2.0
-
-    T = H[:, 2] / tnorm
-    return np.array([H1, H2, H3]), np.array([T])
-
-
 def calibrate_camera(img):
     # termination criteria
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
-    objp = np.zeros((6*9,3), np.float32)
-    objp[:,:2] = np.mgrid[0:9,0:6].T.reshape(-1,2)
-
-    chess = cv2.imread('images/chessboard.jpg')
-    gray_scale_image = cv2.cvtColor(chess, cv2.COLOR_BGR2GRAY)
-    ret, corners = cv2.findChessboardCorners(gray_scale_image, (9,6))
+    objp = np.zeros((6*9, 3), np.float32)
+    objp[:, :2] = np.mgrid[0:9, 0:6].T.reshape(-1, 2)
 
     # Arrays to store object points and image points from all the images.
     objpoints = [] # 3d point in real world space
     imgpoints = [] # 2d points in image plane.
 
-    if ret:
-        objpoints.append(objp)
+    images = glob.glob('images/chess_calibration/*.jpg')
 
-        cv2.cornerSubPix(gray_scale_image,corners,(11,11),(-1,-1),criteria)
-        imgpoints.append(corners)
+    for fname in images:
+        img = cv2.imread(fname)
+        gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 
-    ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray_scale_image.shape[::-1],None,None)
+        # Find the chess board corners
+        ret, corners = cv2.findChessboardCorners(gray, (9,6),None)
+
+        if ret:
+            objpoints.append(objp)
+
+            cv2.cornerSubPix(gray,corners,(11,11),(-1,-1),criteria)
+            imgpoints.append(corners)
+
+    ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1],None,None)
     return ret, mtx, dist
 
 
@@ -206,16 +191,17 @@ def process_from_file():
     # Get contours
     image_rectangular_contours = get_rectangular_contours(binary_image)
 
-    # Compute homography
-    homography = compare_contours(binary_image, image_rectangular_contours, binary_marker_image)
-
-    rotation_matrix, translation_matrix = camera_pose_from_homography(homography)
+    # Compute similarity and return src
+    src = compare_contours(binary_image, image_rectangular_contours, binary_marker_image)
 
     axis = np.float32([[0,0,0], [0,3,0], [3,3,0], [3,0,0],
                    [0,0,-3],[0,3,-3],[3,3,-3],[3,0,-3] ])
 
-    # project 3D points to image plane
-    imgpts, jac = cv2.projectPoints(axis, rotation_matrix, translation_matrix, mtx, dist)
+    objp = np.array([[0,0,0],[100,0,0],[100,100,0],[0,100,0]], dtype=np.float32)
+    src = np.array([[ 568, 249], [ 554,  423], [ 758, 429], [ 758, 256]], dtype=np.float32)
+
+    ret, rvec, tvec = cv2.solvePnP(objp, src, mtx, dist)
+    imgpts, jac = cv2.projectPoints(axis, rvec, tvec, mtx, dist)
 
     gray_scale_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2GRAY)
     img = draw(gray_scale_image, imgpts)
@@ -232,6 +218,7 @@ def process_from_cam():
         _, frame = cap.read()
         binary_image = binarize_image(frame)
         rectangular_contours = get_rectangular_contours(binary_image)
+
         img_contours = cv2.drawContours(copy.copy(frame), rectangular_contours, -1, (0, 255, 0), 3)
         cv2.imshow('Imagem com bordos quadrados', img_contours)
 
