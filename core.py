@@ -172,13 +172,13 @@ def draw(img, imgpts):
         img = cv2.line(img, tuple(imgpts[i]), tuple(imgpts[j]),(255),3)
 
     # draw top layer in red color
-    img = cv2.drawContours(img, [imgpts[4:]],-1,(0,0,255),3)
+    img = cv2.drawContours(img, [imgpts[4:]],-1,(255,0,0),3)
 
     return img
 
 def process_from_file():
     # Image sources
-    original_image = cv2.imread('images/image.jpg')
+    original_image = cv2.imread('images/image201412170002.jpg')
     marker_image = cv2.imread('images/pattern_hiro_crop.jpg')
 
     # Calibrate camera
@@ -194,17 +194,17 @@ def process_from_file():
     # Compute similarity and return src
     src = compare_contours(binary_image, image_rectangular_contours, binary_marker_image)
 
-    axis = np.float32([[0,0,0], [0,3,0], [3,3,0], [3,0,0],
-                   [0,0,-3],[0,3,-3],[3,3,-3],[3,0,-3] ])
+    axis = np.float32([[0,0,0], [30,0,0], [30,30,0], [0,30,0],
+                   [0,0,-30],[30,0,-30],[30,30,-30],[0,30,-30] ])
 
-    objp = np.array([[0,0,0],[100,0,0],[100,100,0],[0,100,0]], dtype=np.float32)
-    src = np.array([[ 568, 249], [ 554,  423], [ 758, 429], [ 758, 256]], dtype=np.float32)
+    src = src.reshape(4,2)
+    objp = np.array([[0,0,0],[30,0,0],[30,30,0],[0,30,0]], dtype=np.float32)
+
 
     ret, rvec, tvec = cv2.solvePnP(objp, src, mtx, dist)
     imgpts, jac = cv2.projectPoints(axis, rvec, tvec, mtx, dist)
 
-    gray_scale_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2GRAY)
-    img = draw(gray_scale_image, imgpts)
+    img = draw(original_image, imgpts)
     cv2.imshow('Virtual Reality FEUP', img)
 
     cv2.waitKey(0)
@@ -217,10 +217,30 @@ def process_from_cam():
     while True:
         _, frame = cap.read()
         binary_image = binarize_image(frame)
-        rectangular_contours = get_rectangular_contours(binary_image)
+        marker_image = cv2.imread('images/pattern_hiro_crop.jpg')
+        image_rectangular_contours = get_rectangular_contours(binary_image)
 
-        img_contours = cv2.drawContours(copy.copy(frame), rectangular_contours, -1, (0, 255, 0), 3)
-        cv2.imshow('Imagem com bordos quadrados', img_contours)
+        # Calibrate camera
+        ret, mtx, dist = calibrate_camera(frame)
+
+        # Binarize images
+        binary_marker_image = binarize_image(marker_image)
+
+        # Compute similarity and return src
+        src = compare_contours(binary_image, image_rectangular_contours, binary_marker_image)
+
+        axis = np.float32([[0,0,0], [30,0,0], [30,30,0], [0,30,0],
+                       [0,0,-30],[30,0,-30],[30,30,-30],[0,30,-30] ])
+
+        src = src.reshape(4,2)
+        objp = np.array([[0,0,0],[30,0,0],[30,30,0],[0,30,0]], dtype=np.float32)
+
+        ret, rvec, tvec = cv2.solvePnP(objp, src, mtx, dist)
+        imgpts, jac = cv2.projectPoints(axis, rvec, tvec, mtx, dist)
+
+        img = draw(frame, imgpts)
+        cv2.imshow('Virtual Reality FEUP', img)
+
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
