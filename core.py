@@ -148,13 +148,15 @@ def draw(img, imgpts):
 
 def process_from_file():
     # Image sources
-    original_image = cv2.imread('images/image201412170002.jpg')
+    original_image = cv2.imread('images/image201412170001.jpg')
     marker_image = cv2.imread('images/pattern_hiro_crop.jpg')
+    sec_marker_image = cv2.imread('images/pattern_kanji_crop.jpg')
 
     # Calibrate camera
     ret, mtx, dist = calibrate_camera(original_image)
 
     # Binarize images
+    sec_binary_marker_image = binarize_image(sec_marker_image)
     binary_image = binarize_image(original_image)
     binary_marker_image = binarize_image(marker_image)
 
@@ -163,20 +165,25 @@ def process_from_file():
 
     # Compute similarity and return src
     src = compare_contours(binary_image, image_rectangular_contours, binary_marker_image)
+    if type(src) is bool:
+        src = compare_contours(binary_image, image_rectangular_contours, sec_binary_marker_image)
 
     axis = np.float32([[0,0,0], [30,0,0], [30,30,0], [0,30,0],
-                   [0,0,30],[30,0,30],[30,30,30],[0,30,30] ])
+                       [0,0,30],[30,0,30],[30,30,30],[0,30,30] ])
 
-    # Convert src to the right type for solvePnP method
-    src = src.reshape(4,2)
-    objp = np.array([[0,0,0],[30,0,0],[30,30,0],[0,30,0]], dtype=np.float32)
+    if type(src) is not bool:
+        # Convert src to the right type for solvePnP method
+        src = src.reshape(4,2)
+        objp = np.array([[0,0,0],[30,0,0],[30,30,0],[0,30,0]], dtype=np.float32)
 
-    # Get rotation and translation vectors and Project Points
-    ret, rvec, tvec = cv2.solvePnP(objp, src, mtx, dist)
-    imgpts, jac = cv2.projectPoints(axis, rvec, tvec, mtx, dist)
+        # Get rotation and translation vectors and Project Points
+        ret, rvec, tvec = cv2.solvePnP(objp, src, mtx, dist)
+        imgpts, jac = cv2.projectPoints(axis, rvec, tvec, mtx, dist)
 
-    img = draw(original_image, imgpts)
-    cv2.imshow('Virtual Reality FEUP', img)
+        img = draw(original_image, imgpts)
+        cv2.imshow('Virtual Reality FEUP', img)
+    else:
+        cv2.imshow('Virtual Reality FEUP', original_image)
 
     cv2.waitKey(0)
     cv2.destroyAllWindows()
@@ -187,18 +194,24 @@ def process_from_cam():
 
     while True:
         _, frame = cap.read()
-        binary_image = binarize_image(frame)
+
         marker_image = cv2.imread('images/pattern_hiro_crop.jpg')
-        image_rectangular_contours = get_rectangular_contours(binary_image)
+        sec_marker_image = cv2.imread('images/pattern_kanji_crop.jpg')
 
         # Calibrate camera
         ret, mtx, dist = calibrate_camera(frame)
 
         # Binarize images
+        sec_binary_marker_image = binarize_image(sec_marker_image)
         binary_marker_image = binarize_image(marker_image)
+        binary_image = binarize_image(frame)
+
+        image_rectangular_contours = get_rectangular_contours(binary_image)
 
         # Compute similarity and return src
         src = compare_contours(binary_image, image_rectangular_contours, binary_marker_image)
+        if type(src) is bool:
+            src = compare_contours(binary_image, image_rectangular_contours, sec_binary_marker_image)
 
         axis = np.float32([[0,0,0], [30,0,0], [30,30,0], [0,30,0],
                        [0,0,30],[30,0,30],[30,30,30],[0,30,30] ])
