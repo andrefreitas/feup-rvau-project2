@@ -3,6 +3,7 @@ import copy
 import numpy as np
 import glob
 
+
 # Returns the cosine of the Angle
 def angle_cos(p0, p1, p2):
     d1, d2 = (p0-p1).astype('float'), (p2-p1).astype('float')
@@ -32,40 +33,6 @@ def binarize_image(original_image):
     gray_scale_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2GRAY)
     _, binary_image = cv2.threshold(gray_scale_image, 127, 255, cv2.THRESH_BINARY)
     return binary_image
-
-
-# Get marker borders
-def get_marker_borders(marker_image):
-    contours = get_rectangular_contours(marker_image)
-    contours_areas_sorted = sorted(contours, key=lambda c: cv2.contourArea(c), reverse=True)
-    return contours_areas_sorted[0]
-
-
-def convert_to_list(ndarray_structure):
-    return map(lambda x: x[0], ndarray_structure.tolist())
-
-
-def get_dimensions(points):
-    x_min = points[0][0]
-    x_max = points[0][0]
-    y_min = points[0][1]
-    y_max = points[0][1]
-
-    for point in points:
-        x = point[0]
-        y = point[1]
-        if x < x_min:
-            x_min = x
-        if x > x_max:
-            x_max = x
-        if y < y_min:
-            y_min = y
-        if y > y_max:
-            y_max = y
-
-    width = x_max - x_min + 1
-    height = y_max - y_min + 1
-    return width, height
 
 
 # http://opencvpython.blogspot.pt/2012/06/contours-2-brotherhood.html
@@ -131,6 +98,7 @@ def compute_similarity(img1, img2):
     return similarity
 
 
+#http://docs.opencv.org/trunk/doc/py_tutorials/py_calib3d/py_calibration/py_calibration.html#calibration
 def calibrate_camera(img):
     # termination criteria
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
@@ -154,27 +122,29 @@ def calibrate_camera(img):
         if ret:
             objpoints.append(objp)
 
-            cv2.cornerSubPix(gray,corners,(11,11),(-1,-1),criteria)
+            cv2.cornerSubPix(gray, corners, (11, 11), (-1, -1), criteria)
             imgpoints.append(corners)
 
-    ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1],None,None)
+    ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
     return ret, mtx, dist
 
 
+#http://docs.opencv.org/trunk/doc/py_tutorials/py_calib3d/py_pose/py_pose.html#pose-estimation
 def draw(img, imgpts):
-    imgpts = np.int32(imgpts).reshape(-1,2)
+    imgpts = np.int32(imgpts).reshape(-1, 2)
 
     # draw ground floor in green
-    img = cv2.drawContours(img, [imgpts[:4]],-1,(0,255,0),-3)
+    img = cv2.drawContours(img, [imgpts[:4]], -1, (0, 255, 0), -3)
 
     # draw pillars in blue color
-    for i,j in zip(range(4),range(4,8)):
-        img = cv2.line(img, tuple(imgpts[i]), tuple(imgpts[j]),(255),3)
+    for i, j in zip(range(4), range(4, 8)):
+        img = cv2.line(img, tuple(imgpts[i]), tuple(imgpts[j]), (255), 3)
 
     # draw top layer in red color
-    img = cv2.drawContours(img, [imgpts[4:]],-1,(255,0,0),3)
+    img = cv2.drawContours(img, [imgpts[4:]], -1, (255, 0, 0), 3)
 
     return img
+
 
 def process_from_file():
     # Image sources
@@ -195,12 +165,13 @@ def process_from_file():
     src = compare_contours(binary_image, image_rectangular_contours, binary_marker_image)
 
     axis = np.float32([[0,0,0], [30,0,0], [30,30,0], [0,30,0],
-                   [0,0,-30],[30,0,-30],[30,30,-30],[0,30,-30] ])
+                   [0,0,30],[30,0,30],[30,30,30],[0,30,30] ])
 
+    # Convert src to the right type for solvePnP method
     src = src.reshape(4,2)
     objp = np.array([[0,0,0],[30,0,0],[30,30,0],[0,30,0]], dtype=np.float32)
 
-
+    # Get rotation and translation vectors and Project Points
     ret, rvec, tvec = cv2.solvePnP(objp, src, mtx, dist)
     imgpts, jac = cv2.projectPoints(axis, rvec, tvec, mtx, dist)
 
@@ -230,8 +201,9 @@ def process_from_cam():
         src = compare_contours(binary_image, image_rectangular_contours, binary_marker_image)
 
         axis = np.float32([[0,0,0], [30,0,0], [30,30,0], [0,30,0],
-                       [0,0,-30],[30,0,-30],[30,30,-30],[0,30,-30] ])
+                       [0,0,30],[30,0,30],[30,30,30],[0,30,30] ])
 
+        # Check if similar or not before drawing
         if type(src) is not bool:
             src = src.reshape(4,2)
             objp = np.array([[0,0,0],[30,0,0],[30,30,0],[0,30,0]], dtype=np.float32)
